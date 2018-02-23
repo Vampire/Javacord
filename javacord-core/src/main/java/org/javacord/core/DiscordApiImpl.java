@@ -88,6 +88,7 @@ import org.javacord.api.listener.server.role.RoleCreateListener;
 import org.javacord.api.listener.server.role.RoleDeleteListener;
 import org.javacord.api.listener.server.role.UserRoleAddListener;
 import org.javacord.api.listener.server.role.UserRoleRemoveListener;
+import org.javacord.api.listener.server.voice.VoiceServerUpdateListener;
 import org.javacord.api.listener.user.UserChangeActivityListener;
 import org.javacord.api.listener.user.UserChangeAvatarListener;
 import org.javacord.api.listener.user.UserChangeDiscriminatorListener;
@@ -1980,6 +1981,16 @@ public class DiscordApiImpl implements DiscordApi {
     @Override
     public List<CachedMessageUnpinListener> getCachedMessageUnpinListeners() {
         return getListeners(CachedMessageUnpinListener.class);
+    }
+
+    @Override
+    public ListenerManager<VoiceServerUpdateListener> addVoiceServerUpdateListener(VoiceServerUpdateListener listener) {
+        return addListener(VoiceServerUpdateListener.class, listener);
+    }
+
+    @Override
+    public List<VoiceServerUpdateListener> getVoiceServerUpdateListeners() {
+        return getListeners(VoiceServerUpdateListener.class);
     }
 
     @Override

@@ -89,6 +89,7 @@ import org.javacord.api.listener.server.role.RoleCreateListener;
 import org.javacord.api.listener.server.role.RoleDeleteListener;
 import org.javacord.api.listener.server.role.UserRoleAddListener;
 import org.javacord.api.listener.server.role.UserRoleRemoveListener;
+import org.javacord.api.listener.server.voice.VoiceServerUpdateListener;
 import org.javacord.api.listener.user.UserChangeActivityListener;
 import org.javacord.api.listener.user.UserChangeAvatarListener;
 import org.javacord.api.listener.user.UserChangeDiscriminatorListener;
@@ -2632,6 +2633,21 @@ public interface DiscordApi {
      * @return A list with all registered cached message unpin listeners.
      */
     List<CachedMessageUnpinListener> getCachedMessageUnpinListeners();
+
+    /**
+     *Adds a {@link VoiceServerUpdateListener}.
+     *
+     *@param listener The listener to add.
+     *@return The manager of the listener.
+     */
+    ListenerManager<VoiceServerUpdateListener> addVoiceServerUpdateListener(VoiceServerUpdateListener listener);
+
+    /**
+     *Gets a list with all {@link VoiceServerUpdateListener}s.
+     *
+     *@return A list with all registered {@code VoiceServerUpdateListener}s.
+     */
+    List<VoiceServerUpdateListener> getVoiceServerUpdateListeners();
 
     /**
      * Adds a {@code GloballyAttachableListener}.
