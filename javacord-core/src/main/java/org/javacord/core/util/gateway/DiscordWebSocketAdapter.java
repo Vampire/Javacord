@@ -42,6 +42,7 @@ import org.javacord.core.util.handler.guild.GuildMemberRemoveHandler;
 import org.javacord.core.util.handler.guild.GuildMemberUpdateHandler;
 import org.javacord.core.util.handler.guild.GuildMembersChunkHandler;
 import org.javacord.core.util.handler.guild.GuildUpdateHandler;
+import org.javacord.core.util.handler.guild.VoiceServerUpdateHandler;
 import org.javacord.core.util.handler.guild.VoiceStateUpdateHandler;
 import org.javacord.core.util.handler.guild.role.GuildRoleCreateHandler;
 import org.javacord.core.util.handler.guild.role.GuildRoleDeleteHandler;
@@ -262,6 +263,15 @@ public class DiscordWebSocketAdapter extends WebSocketAdapter {
         } finally {
             gatewayWriteLock.unlock();
         }
+    }
+
+    /**
+     * Gets the current session id.
+     *
+     * @return The current session id.
+     */
+    protected String getSessionId() {
+        return sessionId;
     }
 
     /**
@@ -693,6 +703,7 @@ public class DiscordWebSocketAdapter extends WebSocketAdapter {
         addHandler(new GuildMemberUpdateHandler(api));
         addHandler(new GuildUpdateHandler(api));
         addHandler(new VoiceStateUpdateHandler(api));
+        addHandler(new VoiceServerUpdateHandler(api));
 
         // role
         addHandler(new GuildRoleCreateHandler(api));
