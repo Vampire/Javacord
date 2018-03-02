@@ -1,5 +1,6 @@
 package org.javacord.api.entity.channel;
 
+import org.javacord.api.entity.DiscordEntity;
 import org.javacord.api.entity.permission.PermissionState;
 import org.javacord.api.entity.permission.PermissionType;
 import org.javacord.api.entity.permission.Permissions;
@@ -19,6 +20,8 @@ import org.javacord.api.util.event.ListenerManager;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -114,6 +117,17 @@ public interface ServerChannel extends Channel {
      */
     default CompletableFuture<Void> updateRawPosition(int rawPosition) {
         return createUpdater().setRawPosition(rawPosition).update();
+    }
+
+    /**
+     * Gets the overwritten permissions in this channel.
+     *
+     * @return The overwritten permissions.
+     */
+    default Map<DiscordEntity, Permissions> getOverwrittenPermissions() {
+        Map<DiscordEntity, Permissions> result = new HashMap<>(getOverwrittenPermissionsForRoles());
+        result.putAll(getOverwrittenPermissionsForUsers());
+        return Collections.unmodifiableMap(result);
     }
 
     /**
