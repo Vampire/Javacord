@@ -2,7 +2,6 @@ package org.javacord.core.entity.channel;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import org.javacord.api.entity.DiscordEntity;
-import org.javacord.api.entity.channel.Channel;
 import org.javacord.api.entity.channel.ChannelCategory;
 import org.javacord.api.entity.channel.ServerChannel;
 import org.javacord.api.entity.channel.ServerTextChannel;
@@ -22,7 +21,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 

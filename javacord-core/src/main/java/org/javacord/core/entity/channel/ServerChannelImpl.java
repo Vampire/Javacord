@@ -311,6 +311,17 @@ public abstract class ServerChannelImpl implements ServerChannel, InternalChanne
     }
 
     @Override
+    public Map<User, Permissions> getOverwrittenPermissionsForUsers() {
+        Server server = getServer();
+        return Collections.unmodifiableMap(
+                overwrittenUserPermissions.entrySet().stream()
+                        .collect(Collectors.toMap(
+                                entry -> server.getMemberById(entry.getKey()).orElseThrow(AssertionError::new),
+                                Map.Entry::getValue))
+        );
+    }
+
+    @Override
     public Permissions getOverwrittenPermissions(Role role) {
         return overwrittenRolePermissions.getOrDefault(role.getId(), PermissionsImpl.EMPTY_PERMISSIONS);
     }
