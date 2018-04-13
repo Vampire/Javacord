@@ -7,6 +7,10 @@ ext {
             project.findProperty('signing.password')
     it.'signing.keyId' = project.findProperty('javacord.signing.keyId') ?:
             project.findProperty('signing.keyId')
+    sonatypeUsername = project.findProperty('javacord.sonatype.username') ?:
+            project.findProperty('sonatype.username')
+    sonatypePassword = project.findProperty('javacord.sonatype.password') ?:
+            project.findProperty('sonatype.password')
 }
 
 allprojects {
@@ -31,6 +35,21 @@ allprojects {
     signArchives.signatureFiles.each { signArchives.outputs.file it }
 
     publishing {
+        repositories {
+            maven {
+                name 'sonatype'
+                if (releaseVersion) {
+                    url 'https://oss.sonatype.org/service/local/staging/deploy/maven2/'
+                } else {
+                    url 'https://oss.sonatype.org/content/repositories/snapshots/'
+                }
+                credentials {
+                    username sonatypeUsername
+                    password sonatypePassword
+                }
+            }
+        }
+
         publications {
             javacord(MavenPublication) { publication ->
                 if (releaseVersion) {
