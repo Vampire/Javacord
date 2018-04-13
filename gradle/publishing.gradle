@@ -1,3 +1,44 @@
+def releaseVersion = !version.toString().endsWith('-SNAPSHOT')
+
+ext {
+    it.'signing.secretKeyRingFile' = project.findProperty('javacord.signing.secretKeyRingFile') ?:
+            project.findProperty('signing.secretKeyRingFile')
+    it.'signing.password' = project.findProperty('javacord.signing.password') ?:
+            project.findProperty('signing.password')
+    it.'signing.keyId' = project.findProperty('javacord.signing.keyId') ?:
+            project.findProperty('signing.keyId')
+}
+
+allprojects {
+    apply plugin: 'signing'
+
+    // The whole signing stuff in combination with maven-publish should work more automagical after
+    // https://github.com/gradle/gradle/issues/4943 was done in Gradle 4.8
+    signing {
+        // signing is required if this is a release version and the artifacts are to be published
+        required {
+            releaseVersion && allprojects.tasks*.withType(PublishToMavenRepository).flatten().find {
+                gradle.taskGraph.hasTask it
+            }
+        }
+        // sign the JARs
+        sign configurations.archives
+    }
+
+    // add the signature files as task outputs, this is a work-around for
+    // https://github.com/gradle/gradle/issues/4980 which is fixed in Gradle 4.8
+    signArchives.signatureFiles.each { signArchives.outputs.file it }
+
+    // sign the generated POM
+    tasks.withType(GenerateMavenPom) {
+        signArchives.dependsOn it
+        signArchives.sign it.outputs.files.singleFile
+        // add the signature files as task outputs, this is a work-around for
+        // https://github.com/gradle/gradle/issues/4980 which is fixed in Gradle 4.8
+        signArchives.signatureFiles.each { signArchives.outputs.file it }
+    }
+}
+
 subprojects {
     publishing {
         publications {
