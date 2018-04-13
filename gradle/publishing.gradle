@@ -1,3 +1,15 @@
+import io.codearte.gradle.nexus.BaseStagingTask
+import io.codearte.gradle.nexus.NexusStagingPlugin
+
+buildscript {
+    repositories {
+        gradlePluginPortal()
+    }
+    dependencies {
+        classpath 'io.codearte.gradle.nexus:gradle-nexus-staging-plugin:0.11.0'
+    }
+}
+
 def releaseVersion = !version.toString().endsWith('-SNAPSHOT')
 
 ext {
@@ -11,6 +23,8 @@ ext {
             project.findProperty('sonatype.username')
     sonatypePassword = project.findProperty('javacord.sonatype.password') ?:
             project.findProperty('sonatype.password')
+    sonatypeStagingProfileId = project.findProperty('javacord.sonatype.stagingProfileId') ?:
+            project.findProperty('sonatype.stagingProfileId')
 }
 
 allprojects {
@@ -111,4 +125,19 @@ publishing {
             }
         }
     }
+}
+
+apply plugin: NexusStagingPlugin
+// remove superfluous tasks from NexusStagingPlugin
+tasks.removeAll([promoteRepository, closeAndPromoteRepository, getStagingProfile])
+
+nexusStaging {
+    stagingProfileId sonatypeStagingProfileId
+    username sonatypeUsername
+    password sonatypePassword
+}
+
+// make sure the staging tasks are run after any publishing tasks if both are to be run
+tasks.withType(BaseStagingTask) {
+    it.mustRunAfter allprojects.tasks*.withType(PublishToMavenRepository)
 }
