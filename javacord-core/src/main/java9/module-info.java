@@ -1,5 +1,6 @@
 module org.javacord.core {
     requires logging.interceptor;
+    requires xsalsa20poly1305;
 
     requires java.logging;
 

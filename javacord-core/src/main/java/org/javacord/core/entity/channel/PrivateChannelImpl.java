@@ -62,7 +62,8 @@ public class PrivateChannelImpl
         this.api = api;
         this.recipient = (UserImpl) api.getOrCreateUser(data.get("recipients").get(0));
         this.messageCache = new MessageCacheImpl(
-                api, api.getDefaultMessageCacheCapacity(), api.getDefaultMessageCacheStorageTimeInSeconds());
+                api, api.getDefaultMessageCacheCapacity(), api.getDefaultMessageCacheStorageTimeInSeconds(),
+                api.isDefaultAutomaticMessageCacheCleanupEnabled());
 
         id = Long.parseLong(data.get("id").asText());
         recipient.setChannel(this);
