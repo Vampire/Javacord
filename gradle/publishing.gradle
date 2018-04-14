@@ -141,3 +141,14 @@ nexusStaging {
 tasks.withType(BaseStagingTask) {
     it.mustRunAfter allprojects.tasks*.withType(PublishToMavenRepository)
 }
+
+apply plugin: 'net.researchgate.release'
+
+task buildAll(dependsOn: allprojects.tasks.build)
+
+release {
+    tagTemplate = 'v$version'
+    buildTasks = ['buildAll']
+}
+
+afterReleaseBuild.dependsOn allprojects.tasks*.withType(PublishToMavenRepository), closeRepository
