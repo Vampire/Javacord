@@ -7,7 +7,7 @@ This README is for the rewrite of Javacord (aka. Javacord 3) and not complete ye
 If you have any trouble with Javacord 3, it's highly recommended to join the Javacord Discord server ([Invite](https://discord.gg/0qJ2jjyneLEgG7y3))
 and ask for help there.
 
-## Feature Coverage
+## Feature Coverages
 
 Javacord covers every action a Discord bot is able to perform (e.g. sending messages, banning users, editing servers, etc.)
 **besides** sending voice, which will be added in a later release. New features introduced by Discord are usually added
