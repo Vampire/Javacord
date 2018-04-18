@@ -18,7 +18,7 @@ The recommended way to "download" Javacord is to use a build manager like Maven.
 If you are not familiar with Maven, you can take a look at the [Setup Guide](https://github.com/BtoBastian/Javacord/wiki#setup) 
 or directly download it from [Jenkins](http://ci.ketrwu.de/job/Javacord/branch/master/lastSuccessfulBuild/).
 
-**Repository**
+**Repositorü**
 ```xml
 <repository>
     <id>jitpack.io</id>
