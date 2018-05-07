@@ -11,6 +11,7 @@ import org.javacord.api.event.message.CachedMessageUnpinEvent;
 import org.javacord.api.event.message.MessageEditEvent;
 import org.javacord.api.listener.message.CachedMessagePinListener;
 import org.javacord.api.listener.message.CachedMessageUnpinListener;
+import org.javacord.api.listener.message.MessageAttachableListenerManager;
 import org.javacord.api.listener.message.MessageEditListener;
 import org.javacord.core.entity.message.MessageImpl;
 import org.javacord.core.entity.message.embed.EmbedBuilderDelegateImpl;
@@ -195,7 +196,7 @@ public class MessageUpdateHandler extends PacketHandler {
      */
     private void dispatchEditEvent(MessageEditEvent event) {
         List<MessageEditListener> listeners = new ArrayList<>();
-        listeners.addAll(Message.getMessageEditListeners(api, event.getMessageId()));
+        listeners.addAll(MessageAttachableListenerManager.getMessageEditListeners(api, event.getMessageId()));
         listeners.addAll(event.getChannel().getMessageEditListeners());
         if (event.getChannel() instanceof ServerChannel) {
             listeners.addAll(((ServerChannel) event.getChannel()).getServer().getMessageEditListeners());
