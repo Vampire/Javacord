@@ -8,6 +8,7 @@ import org.javacord.api.event.server.ServerJoinEvent;
 import org.javacord.core.entity.server.ServerImpl;
 import org.javacord.core.event.server.ServerBecomesAvailableEventImpl;
 import org.javacord.core.event.server.ServerJoinEventImpl;
+import org.javacord.core.listener.EventDispatchUtil;
 import org.javacord.core.util.gateway.PacketHandler;
 
 /**
@@ -34,15 +35,19 @@ public class GuildCreateHandler extends PacketHandler {
             Server server = new ServerImpl(api, packet);
             ServerBecomesAvailableEvent event = new ServerBecomesAvailableEventImpl(server);
 
-            api.getEventDispatcher().dispatchEvent(server,
-                    api.getServerBecomesAvailableListeners(), listener -> listener.onServerBecomesAvailable(event));
+            EventDispatchUtil.dispatchToServerBecomesAvailableListeners(
+                    server,
+                    api,
+                    listener -> listener.onServerBecomesAvailable(event));
             return;
         }
 
         Server server = new ServerImpl(api, packet);
         ServerJoinEvent event = new ServerJoinEventImpl(server);
 
-        api.getEventDispatcher().dispatchEvent(server, api.getServerJoinListeners(),
+        EventDispatchUtil.dispatchToServerJoinListeners(
+                server,
+                api,
                 listener -> listener.onServerJoin(event));
     }
 

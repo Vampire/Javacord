@@ -16,10 +16,9 @@ import org.javacord.core.entity.channel.PrivateChannelImpl;
 import org.javacord.core.entity.channel.ServerVoiceChannelImpl;
 import org.javacord.core.event.channel.server.voice.ServerVoiceChannelMemberJoinEventImpl;
 import org.javacord.core.event.channel.server.voice.ServerVoiceChannelMemberLeaveEventImpl;
+import org.javacord.core.listener.EventDispatchUtil;
 import org.javacord.core.util.gateway.PacketHandler;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -106,16 +105,13 @@ public class VoiceStateUpdateHandler extends PacketHandler {
         ServerVoiceChannelMemberJoinEvent event = new ServerVoiceChannelMemberJoinEventImpl(
                 userId, newChannel, oldChannel);
 
-        List<ServerVoiceChannelMemberJoinListener> listeners = new ArrayList<>();
-        listeners.addAll(api.getObjectListeners(User.class, userId, ServerVoiceChannelMemberJoinListener.class));
-        listeners.addAll(newChannel.getServerVoiceChannelMemberJoinListeners());
-        if (server != null) {
-            listeners.addAll(server.getServerVoiceChannelMemberJoinListeners());
-        }
-        listeners.addAll(api.getServerVoiceChannelMemberJoinListeners());
-
-        api.getEventDispatcher().dispatchEvent(server,
-                listeners, listener -> listener.onServerVoiceChannelMemberJoin(event));
+        EventDispatchUtil.dispatchToServerVoiceChannelMemberJoinListeners(
+                server,
+                server,
+                newChannel,
+                userId,
+                api,
+                listener -> listener.onServerVoiceChannelMemberJoin(event));
     }
 
     private void dispatchServerVoiceChannelMemberLeaveEvent(
@@ -123,16 +119,13 @@ public class VoiceStateUpdateHandler extends PacketHandler {
         ServerVoiceChannelMemberLeaveEvent event = new ServerVoiceChannelMemberLeaveEventImpl(
                 userId, newChannel, oldChannel);
 
-        List<ServerVoiceChannelMemberLeaveListener> listeners = new ArrayList<>();
-        listeners.addAll(api.getObjectListeners(User.class, userId, ServerVoiceChannelMemberLeaveListener.class));
-        listeners.addAll(oldChannel.getServerVoiceChannelMemberLeaveListeners());
-        if (server != null) {
-            listeners.addAll(server.getServerVoiceChannelMemberLeaveListeners());
-        }
-        listeners.addAll(api.getServerVoiceChannelMemberLeaveListeners());
-
-        api.getEventDispatcher().dispatchEvent(server,
-                listeners, listener -> listener.onServerVoiceChannelMemberLeave(event));
+        EventDispatchUtil.dispatchToServerVoiceChannelMemberLeaveListeners(
+                server,
+                server,
+                oldChannel,
+                userId,
+                api,
+                listener -> listener.onServerVoiceChannelMemberLeave(event));
     }
 
 }
