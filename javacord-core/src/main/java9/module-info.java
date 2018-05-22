@@ -8,7 +8,7 @@ module org.javacord.core {
     requires transitive okhttp;
     requires transitive com.fasterxml.jackson.databind;
     requires transitive nv.websocket.client;
-    requires transitive slf4j.api;
+    requires transitive org.slf4j;
 
     requires transitive java.desktop;
 

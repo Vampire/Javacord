@@ -4,8 +4,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.slf4j.MDC.MDCCloseable;
+import org.slf4j.spi.SLF4JServiceProvider;
 
 import java.util.Map;
+import java.util.ServiceLoader;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -28,14 +30,9 @@ public class LoggerUtil {
     public static Logger getLogger(String name) {
         AtomicBoolean logWarning = new AtomicBoolean(false);
         initialized.updateAndGet(initialized -> {
-            if (!initialized) {
-                try {
-                    // if there's no library this would cause a ClassNotFoundException
-                    Class.forName("org.slf4j.impl.StaticLoggerBinder");
-                } catch (ClassNotFoundException e) {
-                    noLogger.set(true);
-                    logWarning.set(true);
-                }
+            if (!initialized && !ServiceLoader.load(SLF4JServiceProvider.class).iterator().hasNext()) {
+                noLogger.set(true);
+                logWarning.set(true);
             }
             return true;
         });
