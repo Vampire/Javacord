@@ -184,9 +184,9 @@ public interface ServerChannel extends Channel {
      */
     default Permissions getEffectivePermissions(User user) {
         if (getServer().getOwner() == user) {
-            return getServer().getPermissionsOf(user);
+            return getServer().getPermissions(user);
         }
-        PermissionsBuilder builder = new PermissionsBuilder(getServer().getPermissionsOf(user));
+        PermissionsBuilder builder = new PermissionsBuilder(getServer().getPermissions(user));
         Permissions effectiveOverwrittenPermissions = getEffectiveOverwrittenPermissions(user);
         Arrays.stream(PermissionType.values())
                 .filter(type -> effectiveOverwrittenPermissions.getState(type) != PermissionState.NONE)
