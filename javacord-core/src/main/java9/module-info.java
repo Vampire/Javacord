@@ -9,7 +9,7 @@ module org.javacord.core {
     requires transitive okhttp;
     requires transitive com.fasterxml.jackson.databind;
     requires transitive nv.websocket.client;
-    requires transitive org.slf4j;
+    requires transitive org.apache.logging.log4j;
 
     requires transitive java.desktop;
 

@@ -9,6 +9,7 @@ import com.neovisionaries.ws.client.WebSocketAdapter;
 import com.neovisionaries.ws.client.WebSocketException;
 import com.neovisionaries.ws.client.WebSocketFactory;
 import com.neovisionaries.ws.client.WebSocketFrame;
+import org.apache.logging.log4j.Logger;
 import org.javacord.api.Javacord;
 import org.javacord.api.entity.channel.ServerVoiceChannel;
 import org.javacord.api.entity.server.Server;
@@ -18,7 +19,6 @@ import org.javacord.api.util.event.ListenerManager;
 import org.javacord.core.DiscordApiImpl;
 import org.javacord.core.util.logging.LoggerUtil;
 import org.javacord.core.util.logging.WebSocketLogger;
-import org.slf4j.Logger;
 
 import javax.net.ssl.SSLContext;
 import java.io.ByteArrayOutputStream;

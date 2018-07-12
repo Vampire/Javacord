@@ -1,6 +1,7 @@
 package org.javacord.core.util.handler.message;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import org.apache.logging.log4j.Logger;
 import org.javacord.api.DiscordApi;
 import org.javacord.api.entity.channel.ServerChannel;
 import org.javacord.api.entity.message.Message;
@@ -18,7 +19,6 @@ import org.javacord.core.event.message.MessageEditEventImpl;
 import org.javacord.core.listener.EventDispatchUtil;
 import org.javacord.core.util.gateway.PacketHandler;
 import org.javacord.core.util.logging.LoggerUtil;
-import org.slf4j.Logger;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
