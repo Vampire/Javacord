@@ -1,0 +1,39 @@
+import java.security.MessageDigest
+
+task verifyReadme {
+    inputs.file 'README.md' withPropertyName 'readme'
+    inputs.file '.github/README.md.sha256' withPropertyName 'readmeChecksum'
+
+    doLast {
+        if (file('.github/README.md.sha256').text != calculateReadmeChecksum()) {
+            if (gradle.taskGraph.hasTask(updateReadme)) {
+                throw new IllegalStateException("The README.md file was tampered with manually, " +
+                        "if you want to overwrite it, add \"-x $name\" to your Gradle call")
+            }
+            throw new IllegalStateException("The README.md file was tampered with manually")
+        }
+    }
+}
+check.dependsOn verifyReadme
+
+task updateReadme(dependsOn: verifyReadme) {
+    inputs.property 'version', version
+    inputs.file '.github/README_template.md' withPropertyName 'readmeTemplate'
+    outputs.file 'README.md' withPropertyName 'readme'
+    outputs.file '.github/README.md.sha256' withPropertyName 'readmeChecksum'
+
+    doLast {
+        copy {
+            from '.github/README_template.md'
+            into '.'
+            rename { 'README.md' }
+            expand version: version
+        }
+        file('.github/README.md.sha256').text = calculateReadmeChecksum()
+    }
+}
+
+private String calculateReadmeChecksum() {
+    def sha256 = MessageDigest.getInstance('SHA-256')
+    new BigInteger(1, sha256.digest(file('README.md').bytes)).toString(16).padLeft(sha256.digestLength * 2, '0')
+}

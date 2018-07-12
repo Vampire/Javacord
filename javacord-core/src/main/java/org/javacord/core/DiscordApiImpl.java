@@ -88,11 +88,16 @@ import org.javacord.api.listener.server.role.RoleCreateListener;
 import org.javacord.api.listener.server.role.RoleDeleteListener;
 import org.javacord.api.listener.server.role.UserRoleAddListener;
 import org.javacord.api.listener.server.role.UserRoleRemoveListener;
+import org.javacord.api.listener.server.voice.VoiceServerUpdateListener;
 import org.javacord.api.listener.user.UserChangeActivityListener;
 import org.javacord.api.listener.user.UserChangeAvatarListener;
+import org.javacord.api.listener.user.UserChangeDeafenedListener;
 import org.javacord.api.listener.user.UserChangeDiscriminatorListener;
+import org.javacord.api.listener.user.UserChangeMutedListener;
 import org.javacord.api.listener.user.UserChangeNameListener;
 import org.javacord.api.listener.user.UserChangeNicknameListener;
+import org.javacord.api.listener.user.UserChangeSelfDeafenedListener;
+import org.javacord.api.listener.user.UserChangeSelfMutedListener;
 import org.javacord.api.listener.user.UserChangeStatusListener;
 import org.javacord.api.listener.user.UserStartTypingListener;
 import org.javacord.api.util.concurrent.ThreadPool;
@@ -228,6 +233,11 @@ public class DiscordApiImpl implements DiscordApi {
      * The default maximum age of cached messages.
      */
     private volatile int defaultMessageCacheStorageTimeInSeconds = 60 * 60 * 12;
+
+    /**
+     * Whether automatic message cache cleanup is enabled by default.
+     */
+    private boolean defaultAutomaticMessageCacheCleanupEnabled = true;
 
     /**
      * The function to calculate the reconnect delay.
@@ -1002,6 +1012,21 @@ public class DiscordApiImpl implements DiscordApi {
     @Override
     public int getDefaultMessageCacheStorageTimeInSeconds() {
         return defaultMessageCacheStorageTimeInSeconds;
+    }
+
+    @Override
+    public void setAutomaticMessageCacheCleanupEnabled(boolean automaticMessageCacheCleanupEnabled) {
+        this.defaultAutomaticMessageCacheCleanupEnabled = automaticMessageCacheCleanupEnabled;
+        getChannels().stream()
+                .filter(TextChannel.class::isInstance)
+                .map(TextChannel.class::cast)
+                .forEach(channel -> channel.getMessageCache()
+                        .setAutomaticCleanupEnabled(automaticMessageCacheCleanupEnabled));
+    }
+
+    @Override
+    public boolean isDefaultAutomaticMessageCacheCleanupEnabled() {
+        return defaultAutomaticMessageCacheCleanupEnabled;
     }
 
     @Override
@@ -1850,6 +1875,49 @@ public class DiscordApiImpl implements DiscordApi {
     }
 
     @Override
+    public ListenerManager<UserChangeSelfMutedListener> addUserChangeSelfMutedListener(
+            UserChangeSelfMutedListener listener) {
+        return addListener(UserChangeSelfMutedListener.class, listener);
+    }
+
+    @Override
+    public List<UserChangeSelfMutedListener> getUserChangeSelfMutedListeners() {
+        return getListeners(UserChangeSelfMutedListener.class);
+    }
+
+    @Override
+    public ListenerManager<UserChangeSelfDeafenedListener> addUserChangeSelfDeafenedListener(
+            UserChangeSelfDeafenedListener listener) {
+        return addListener(UserChangeSelfDeafenedListener.class, listener);
+    }
+
+    @Override
+    public List<UserChangeSelfDeafenedListener> getUserChangeSelfDeafenedListeners() {
+        return getListeners(UserChangeSelfDeafenedListener.class);
+    }
+
+    @Override
+    public ListenerManager<UserChangeMutedListener> addUserChangeMutedListener(UserChangeMutedListener listener) {
+        return addListener(UserChangeMutedListener.class, listener);
+    }
+
+    @Override
+    public List<UserChangeMutedListener> getUserChangeMutedListeners() {
+        return getListeners(UserChangeMutedListener.class);
+    }
+
+    @Override
+    public ListenerManager<UserChangeDeafenedListener> addUserChangeDeafenedListener(
+            UserChangeDeafenedListener listener) {
+        return addListener(UserChangeDeafenedListener.class, listener);
+    }
+
+    @Override
+    public List<UserChangeDeafenedListener> getUserChangeDeafenedListeners() {
+        return getListeners(UserChangeDeafenedListener.class);
+    }
+
+    @Override
     public ListenerManager<LostConnectionListener> addLostConnectionListener(LostConnectionListener listener) {
         return addListener(LostConnectionListener.class, listener);
     }
@@ -1980,6 +2048,16 @@ public class DiscordApiImpl implements DiscordApi {
     @Override
     public List<CachedMessageUnpinListener> getCachedMessageUnpinListeners() {
         return getListeners(CachedMessageUnpinListener.class);
+    }
+
+    @Override
+    public ListenerManager<VoiceServerUpdateListener> addVoiceServerUpdateListener(VoiceServerUpdateListener listener) {
+        return addListener(VoiceServerUpdateListener.class, listener);
+    }
+
+    @Override
+    public List<VoiceServerUpdateListener> getVoiceServerUpdateListeners() {
+        return getListeners(VoiceServerUpdateListener.class);
     }
 
     @Override

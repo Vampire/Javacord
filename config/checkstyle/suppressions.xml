@@ -6,4 +6,5 @@
 
 <suppressions>
     <suppress id="finalizer" files=".*[\\/]DiscordApiImpl.java$" />
+    <suppress id="CommentsIndentation" files=".*[\\/]DiscordVoiceWebSocketAdapter.java$" />
 </suppressions>

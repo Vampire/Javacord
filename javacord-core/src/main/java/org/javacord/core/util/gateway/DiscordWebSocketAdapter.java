@@ -13,7 +13,9 @@ import com.neovisionaries.ws.client.WebSocketFrame;
 import com.neovisionaries.ws.client.WebSocketListener;
 import org.javacord.api.Javacord;
 import org.javacord.api.entity.activity.Activity;
+import org.javacord.api.entity.channel.ServerVoiceChannel;
 import org.javacord.api.entity.server.Server;
+import org.javacord.api.entity.user.User;
 import org.javacord.api.event.connection.LostConnectionEvent;
 import org.javacord.api.event.connection.ReconnectEvent;
 import org.javacord.api.event.connection.ResumeEvent;
@@ -42,6 +44,7 @@ import org.javacord.core.util.handler.guild.GuildMemberRemoveHandler;
 import org.javacord.core.util.handler.guild.GuildMemberUpdateHandler;
 import org.javacord.core.util.handler.guild.GuildMembersChunkHandler;
 import org.javacord.core.util.handler.guild.GuildUpdateHandler;
+import org.javacord.core.util.handler.guild.VoiceServerUpdateHandler;
 import org.javacord.core.util.handler.guild.VoiceStateUpdateHandler;
 import org.javacord.core.util.handler.guild.role.GuildRoleCreateHandler;
 import org.javacord.core.util.handler.guild.role.GuildRoleDeleteHandler;
@@ -75,6 +78,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.WeakHashMap;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -83,6 +87,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -111,6 +116,11 @@ public class DiscordWebSocketAdapter extends WebSocketAdapter {
     private static final Lock gatewayReadLock = gatewayLock.readLock();
     private static final Lock gatewayWriteLock = gatewayLock.writeLock();
 
+    private static final long WEB_SOCKET_FRAME_SENDING_RATELIMIT_DURATION =
+            TimeUnit.NANOSECONDS.convert(1, TimeUnit.MINUTES);
+    private static final long ONE_SECOND = TimeUnit.NANOSECONDS.convert(1, TimeUnit.SECONDS);
+    private static final int WEB_SOCKET_FRAME_SENDING_RATELIMIT = 120;
+
     private final DiscordApiImpl api;
     private final HashMap<String, PacketHandler> handlers = new HashMap<>();
     private final CompletableFuture<Boolean> ready = new CompletableFuture<>();
@@ -137,6 +147,11 @@ public class DiscordWebSocketAdapter extends WebSocketAdapter {
 
     // A queue which contains server ids for the "request guild members" packet
     private final BlockingQueue<Long> requestGuildMembersQueue = new LinkedBlockingQueue<>();
+
+    // A queue which contains web socket frame sending requests
+    private BlockingQueue<WebSocketFrameSendingQueueEntry> webSocketFrameSendingQueue = new PriorityBlockingQueue<>();
+    private AtomicReference<Thread> webSocketFrameSenderThread = new AtomicReference<>();
+    private AtomicInteger webSocketFrameSendingLimit = new AtomicInteger(WEB_SOCKET_FRAME_SENDING_RATELIMIT);
 
     private static final Map<String, Long> lastIdentificationPerAccount = Collections.synchronizedMap(new HashMap<>());
     private static final ConcurrentMap<String, Semaphore> connectionDelaySemaphorePerAccount =
@@ -208,12 +223,76 @@ public class DiscordWebSocketAdapter extends WebSocketAdapter {
                                 }
                                 logger.debug("Sending request guild members packet {}",
                                              requestGuildMembersPacket.toString());
-                                getWebSocket().sendText(requestGuildMembersPacket.toString());
+                                sendTextFrame(requestGuildMembersPacket.toString());
                             });
                     Thread.sleep(1000);
                 } catch (InterruptedException ignored) {
                 } catch (Throwable t) {
                     logger.error("Failed to process request guild members queue!", t);
+                }
+            }
+        });
+
+        ExecutorService webSocketFrameSenderService =
+                api.getThreadPool().getSingleDaemonThreadExecutorService("Web Socket Frame Sender");
+        webSocketFrameSenderService.submit(() -> {
+            // remember the current thread to be able to interrupt it
+            webSocketFrameSenderThread.set(Thread.currentThread());
+
+            // Lists of send times per web socket which are used to control the 120/60 web socket frame ratelimit
+            Map<WebSocket, List<Long>> sendTimeLists = new WeakHashMap<>();
+
+            while (!webSocketFrameSenderService.isShutdown()) {
+                WebSocketFrameSendingQueueEntry webSocketFrameSendingQueueEntry = null;
+                try {
+                    // wait 1 minute for a web socket frame sender being queued
+                    webSocketFrameSendingQueueEntry = webSocketFrameSendingQueue.poll(1, TimeUnit.MINUTES);
+                    if (webSocketFrameSendingQueueEntry == null) {
+                        // timed out => check whether the abort condition triggers
+                        continue;
+                    }
+
+                    WebSocket webSocket = webSocketFrameSendingQueueEntry.getWebSocket().orElseGet(websocket::get);
+                    List<Long> sendTimeList = sendTimeLists.computeIfAbsent(
+                            webSocket, key -> new ArrayList<>(WEB_SOCKET_FRAME_SENDING_RATELIMIT));
+
+                    long currentNanoTime = System.nanoTime();
+                    if (!sendTimeList.isEmpty()
+                            && (currentNanoTime - sendTimeList.get(0) > WEB_SOCKET_FRAME_SENDING_RATELIMIT_DURATION)) {
+                        // bucket defining send expired, clear the list
+                        sendTimeList.clear();
+                    }
+
+                    // reserve same places for heartbeats
+                    int webSocketFrameSendingLimit = webSocketFrameSendingQueueEntry.isPriorityLifecyle()
+                            ? WEB_SOCKET_FRAME_SENDING_RATELIMIT
+                            : this.webSocketFrameSendingLimit.get();
+
+                    // wait for ratelimit cool down
+                    if (sendTimeList.size() >= webSocketFrameSendingLimit) {
+                        long waitDuration = WEB_SOCKET_FRAME_SENDING_RATELIMIT_DURATION
+                                            - (currentNanoTime - sendTimeList.get(0));
+                        if (waitDuration > 0) {
+                            TimeUnit.NANOSECONDS.sleep(waitDuration + ONE_SECOND);
+                        }
+                        // recheck whether the abort condition triggers and prefer lifecycle and priority frames
+                        continue;
+                    }
+
+                    // store the current send time and actually send the frame
+                    sendTimeList.add(currentNanoTime);
+                    webSocket.sendFrame(webSocketFrameSendingQueueEntry.getFrame());
+                    webSocketFrameSendingQueueEntry = null;
+                } catch (InterruptedException ignored) {
+                } catch (Throwable t) {
+                    logger.error("Failed to process web socket frame sending queue!", t);
+                } finally {
+                    // sending failed, throttling still in effect or interrupt arrived
+                    if (webSocketFrameSendingQueueEntry != null) {
+                        // put the frame back to the queue
+                        webSocketFrameSendingQueue.add(webSocketFrameSendingQueueEntry);
+                        webSocketFrameSendingQueueEntry = null;
+                    }
                 }
             }
         });
@@ -266,11 +345,20 @@ public class DiscordWebSocketAdapter extends WebSocketAdapter {
     }
 
     /**
+     * Gets the current session id.
+     *
+     * @return The current session id.
+     */
+    protected String getSessionId() {
+        return sessionId;
+    }
+
+    /**
      * Disconnects from the websocket.
      */
     public void disconnect() {
         reconnect = false;
-        websocket.get().sendClose(WebSocketCloseReason.DISCONNECT.getNumericCloseCode());
+        sendCloseFrame(WebSocketCloseReason.DISCONNECT.getNumericCloseCode());
         // cancel heartbeat timer if within one minute no disconnect event was dispatched
         api.getThreadPool().getDaemonScheduler().schedule(() -> heartbeatTimer.updateAndGet(future -> {
             if (future != null) {
@@ -362,7 +450,7 @@ public class DiscordWebSocketAdapter extends WebSocketAdapter {
         LostConnectionEvent lostConnectionEvent = new LostConnectionEventImpl(api);
         List<LostConnectionListener> listeners = new ArrayList<>(api.getLostConnectionListeners());
         api.getEventDispatcher()
-                .dispatchEvent(api, listeners, listener -> listener.onLostConnection(lostConnectionEvent));
+                .dispatchEvent(null, listeners, listener -> listener.onLostConnection(lostConnectionEvent));
 
         heartbeatTimer.updateAndGet(future -> {
             if (future != null) {
@@ -419,7 +507,7 @@ public class DiscordWebSocketAdapter extends WebSocketAdapter {
                     ResumeEvent resumeEvent = new ResumeEventImpl(api);
                     List<ResumeListener> listeners = new ArrayList<>(api.getResumeListeners());
                     api.getEventDispatcher()
-                            .dispatchEvent(api, listeners, listener -> listener.onResume(resumeEvent));
+                            .dispatchEvent(null, listeners, listener -> listener.onResume(resumeEvent));
                 }
                 if (type.equals("READY")) {
                     reconnectAttempt.set(0);
@@ -457,7 +545,7 @@ public class DiscordWebSocketAdapter extends WebSocketAdapter {
                         ReconnectEvent reconnectEvent = new ReconnectEventImpl(api);
                         List<ReconnectListener> listeners = new ArrayList<>(api.getReconnectListeners());
                         api.getEventDispatcher()
-                                .dispatchEvent(api, listeners, listener -> listener.onReconnect(reconnectEvent));
+                                .dispatchEvent(null, listeners, listener -> listener.onReconnect(reconnectEvent));
                         ready.complete(true);
                     });
                     logger.debug("Received READY packet");
@@ -467,8 +555,9 @@ public class DiscordWebSocketAdapter extends WebSocketAdapter {
                 sendHeartbeat(websocket);
                 break;
             case RECONNECT:
-                websocket.sendClose(WebSocketCloseReason.COMMANDED_RECONNECT.getNumericCloseCode(),
-                                    WebSocketCloseReason.COMMANDED_RECONNECT.getCloseReason());
+                sendCloseFrame(websocket,
+                               WebSocketCloseReason.COMMANDED_RECONNECT.getNumericCloseCode(),
+                               WebSocketCloseReason.COMMANDED_RECONNECT.getCloseReason());
                 break;
             case INVALID_SESSION:
                 long fakeLastIdentificationTime = System.currentTimeMillis();
@@ -491,6 +580,8 @@ public class DiscordWebSocketAdapter extends WebSocketAdapter {
 
                 JsonNode data = packet.get("d");
                 int heartbeatInterval = data.get("heartbeat_interval").asInt();
+                // calculate reserved places for heartbeats
+                webSocketFrameSendingLimit.set(WEB_SOCKET_FRAME_SENDING_RATELIMIT - 1 - (60_000 / heartbeatInterval));
                 heartbeatTimer.updateAndGet(future -> {
                     if (future != null) {
                         future.cancel(false);
@@ -560,8 +651,9 @@ public class DiscordWebSocketAdapter extends WebSocketAdapter {
                     sendHeartbeat(websocket);
                     logger.debug("Sent heartbeat (interval: {})", heartbeatInterval);
                 } else {
-                    websocket.sendClose(WebSocketCloseReason.HEARTBEAT_NOT_PROPERLY_ANSWERED.getNumericCloseCode(),
-                                        WebSocketCloseReason.HEARTBEAT_NOT_PROPERLY_ANSWERED.getCloseReason());
+                    sendCloseFrame(websocket,
+                                   WebSocketCloseReason.HEARTBEAT_NOT_PROPERLY_ANSWERED.getNumericCloseCode(),
+                                   WebSocketCloseReason.HEARTBEAT_NOT_PROPERLY_ANSWERED.getCloseReason());
                 }
             } catch (Throwable t) {
                 logger.error("Failed to send heartbeat or close web socket!", t);
@@ -580,7 +672,7 @@ public class DiscordWebSocketAdapter extends WebSocketAdapter {
         heartbeatPacket.put("d", lastSeq);
         WebSocketFrame heartbeatFrame = WebSocketFrame.createTextFrame(heartbeatPacket.toString());
         nextHeartbeatFrame.set(heartbeatFrame);
-        websocket.sendFrame(heartbeatFrame);
+        sendFrame(websocket, heartbeatFrame, true, true);
     }
 
     /**
@@ -596,7 +688,7 @@ public class DiscordWebSocketAdapter extends WebSocketAdapter {
                 .put("session_id", sessionId)
                 .put("seq", lastSeq);
         logger.debug("Sending resume packet");
-        websocket.sendText(resumePacket.toString());
+        sendLifecycleTextFrame(websocket, resumePacket.toString());
     }
 
     /**
@@ -650,7 +742,35 @@ public class DiscordWebSocketAdapter extends WebSocketAdapter {
         identifyFrameListeners.add(identifyFrameListener);
         websocket.addListener(identifyFrameListener);
         logger.debug("Sending identify packet");
-        websocket.sendFrame(identifyFrame);
+        sendLifecycleFrame(websocket, identifyFrame);
+    }
+
+    /**
+     * Sends the voice state update packet.
+     *
+     * @param server The server to send the voice state update for. Can be {@code null} if {@code channel} is given.
+     * @param channel The channel to connect to or {@code null} to disconnect from voice.
+     * @param selfMuted Whether to self-mute on the given server. If {@code null}, current state remains unchanged.
+     * @param selfDeafened Whether to self-deafen on the given server. If {@code null}, current state remains unchanged.
+     */
+    public void sendVoiceStateUpdate(
+            Server server, ServerVoiceChannel channel, Boolean selfMuted, Boolean selfDeafened) {
+        ObjectNode updateVoiceStatePacket = JsonNodeFactory.instance.objectNode()
+                .put("op", GatewayOpcode.VOICE_STATE_UPDATE.getCode());
+        if (server == null) {
+            if (channel == null) {
+                throw new IllegalArgumentException("Either server or channel must be given");
+            }
+            server = channel.getServer();
+        }
+        User yourself = api.getYourself();
+        updateVoiceStatePacket.putObject("d")
+                .put("guild_id", server.getIdAsString())
+                .put("channel_id", (channel == null) ? null : channel.getIdAsString())
+                .put("self_mute", (selfMuted == null) ? server.isSelfMuted(yourself) : selfMuted)
+                .put("self_deaf", (selfDeafened == null) ? server.isSelfDeafened(yourself) : selfDeafened);
+        logger.debug("Sending VOICE_STATE_UPDATE packet for channel {} on server {}", channel, server);
+        websocket.get().sendText(updateVoiceStatePacket.toString());
     }
 
     /**
@@ -672,6 +792,7 @@ public class DiscordWebSocketAdapter extends WebSocketAdapter {
         addHandler(new GuildMemberUpdateHandler(api));
         addHandler(new GuildUpdateHandler(api));
         addHandler(new VoiceStateUpdateHandler(api));
+        addHandler(new VoiceServerUpdateHandler(api));
 
         // role
         addHandler(new GuildRoleCreateHandler(api));
@@ -749,7 +870,125 @@ public class DiscordWebSocketAdapter extends WebSocketAdapter {
         activityJson.put("type", activity.map(g -> g.getType().getId()).orElse(0));
         activity.ifPresent(g -> g.getStreamingUrl().ifPresent(url -> activityJson.put("url", url)));
         logger.debug("Updating status (content: {})", updateStatus.toString());
-        websocket.get().sendText(updateStatus.toString());
+        sendTextFrame(updateStatus.toString());
+    }
+
+    /**
+     * Send a close frame with the given close code after ratelimit allows.
+     *
+     * @param closeCode The close code for the close frame.
+     */
+    public void sendCloseFrame(int closeCode) {
+        sendCloseFrame(null, closeCode);
+    }
+
+    /**
+     * Send a close frame over the given web socket with the given close code after ratelimit allows.
+     *
+     * @param webSocket The web socket to send the close frame to.
+     * @param closeCode The close code for the close frame.
+     */
+    public void sendCloseFrame(WebSocket webSocket, int closeCode) {
+        sendFrame(webSocket, WebSocketFrame.createCloseFrame(closeCode), false, true);
+    }
+
+    /**
+     * Send a close frame with the given close code and reason after ratelimit allows.
+     *
+     * @param closeCode The close code for the close frame.
+     * @param reason The reason for the close frame.
+     */
+    public void sendCloseFrame(int closeCode, String reason) {
+        sendCloseFrame(null, closeCode, reason);
+    }
+
+    /**
+     * Send a close frame over the given web socket with the given close code and reason after ratelimit allows.
+     *
+     * @param webSocket The web socket to send the close frame to.
+     * @param closeCode The close code for the close frame.
+     * @param reason The reason for the close frame.
+     */
+    public void sendCloseFrame(WebSocket webSocket, int closeCode, String reason) {
+        sendFrame(webSocket, WebSocketFrame.createCloseFrame(closeCode, reason), false, true);
+    }
+
+    /**
+     * Send a lifecycle text frame with the given message after ratelimit allows.
+     *
+     * @param message The message for the text frame.
+     */
+    public void sendLifecycleTextFrame(String message) {
+        sendFrame(null, WebSocketFrame.createTextFrame(message), false, true);
+    }
+
+    /**
+     * Send a lifecycle text frame over the given web socket with the given message after ratelimit allows.
+     *
+     * @param webSocket The web socket to send the text frame to.
+     * @param message The message for the text frame.
+     */
+    public void sendLifecycleTextFrame(WebSocket webSocket, String message) {
+        sendFrame(webSocket, WebSocketFrame.createTextFrame(message), false, true);
+    }
+
+    /**
+     * Send a text frame with the given message after ratelimit allows.
+     *
+     * @param message The message for the text frame.
+     */
+    public void sendTextFrame(String message) {
+        sendFrame(null, WebSocketFrame.createTextFrame(message), false, false);
+    }
+
+    /**
+     * Send the given lifecycle web socket frame after ratelimit allows.
+     *
+     * @param frame The web socket frame to send.
+     */
+    public void sendLifecycleFrame(WebSocketFrame frame) {
+        sendFrame(null, frame, false, true);
+    }
+
+    /**
+     * Send the given lifecycle web socket frame over the given web socket after ratelimit allows.
+     *
+     * @param webSocket The web socket to send the frame to.
+     * @param frame The web socket frame to send.
+     */
+    public void sendLifecycleFrame(WebSocket webSocket, WebSocketFrame frame) {
+        sendFrame(webSocket, frame, false, true);
+    }
+
+    /**
+     * Send the given web socket frame after ratelimit allows.
+     *
+     * @param frame The web socket frame to send.
+     */
+    public void sendFrame(WebSocketFrame frame) {
+        sendFrame(null, frame, false, false);
+    }
+
+    /**
+     * Send the given web socket frame over the given web socket after ratelimit allows, optionally with priority
+     * before non-priority send requests already present in the queue.
+     *
+     * @param webSocket The web socket to send the frame to.
+     * @param frame The web socket frame to send.
+     * @param priority Whether the frame should be sent with priority.
+     * @param lifecycle Whether the frame is a lifecycle frame and should only be sent over the given or current socket.
+     */
+    private void sendFrame(WebSocket webSocket, WebSocketFrame frame, boolean priority, boolean lifecycle) {
+        logger.debug("Queued {}lifecycle frame for sending with{} priority: {}",
+                     lifecycle ? "" : "non-", priority ? "" : "out", frame);
+        webSocketFrameSendingQueue.add(new WebSocketFrameSendingQueueEntry(
+                Optional.ofNullable(webSocket).orElseGet(() -> lifecycle ? this.websocket.get() : null),
+                frame, priority, lifecycle));
+        if (priority && lifecycle) {
+            // interrupt the web socket frame sender thread to get
+            // the heartbeat out if it is still waiting to send a different frame
+            Optional.ofNullable(webSocketFrameSenderThread.get()).ifPresent(Thread::interrupt);
+        }
     }
 
     /**

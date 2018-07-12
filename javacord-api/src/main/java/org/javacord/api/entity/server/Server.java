@@ -80,11 +80,16 @@ import org.javacord.api.listener.server.role.RoleCreateListener;
 import org.javacord.api.listener.server.role.RoleDeleteListener;
 import org.javacord.api.listener.server.role.UserRoleAddListener;
 import org.javacord.api.listener.server.role.UserRoleRemoveListener;
+import org.javacord.api.listener.server.voice.VoiceServerUpdateListener;
 import org.javacord.api.listener.user.UserChangeActivityListener;
 import org.javacord.api.listener.user.UserChangeAvatarListener;
+import org.javacord.api.listener.user.UserChangeDeafenedListener;
 import org.javacord.api.listener.user.UserChangeDiscriminatorListener;
+import org.javacord.api.listener.user.UserChangeMutedListener;
 import org.javacord.api.listener.user.UserChangeNameListener;
 import org.javacord.api.listener.user.UserChangeNicknameListener;
+import org.javacord.api.listener.user.UserChangeSelfDeafenedListener;
+import org.javacord.api.listener.user.UserChangeSelfMutedListener;
 import org.javacord.api.listener.user.UserChangeStatusListener;
 import org.javacord.api.listener.user.UserStartTypingListener;
 import org.javacord.api.util.event.ListenerManager;
@@ -130,6 +135,114 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
      * @return The nickname of the user.
      */
     Optional<String> getNickname(User user);
+
+    /**
+     * Gets your self-muted state.
+     *
+     * @return Whether you are self-muted.
+     */
+    default boolean areYouSelfMuted() {
+        return isSelfMuted(getApi().getYourself());
+    }
+
+    /**
+     * Gets the self-muted state of the user with the given id.
+     *
+     * @param userId The id of the user to check.
+     * @return Whether the user with the given id is self-muted.
+     */
+    boolean isSelfMuted(long userId);
+
+    /**
+     * Gets the self-muted state of the given user.
+     *
+     * @param user The user to check.
+     * @return Whether the given user is self-muted.
+     */
+    default boolean isSelfMuted(User user) {
+        return isSelfMuted(user.getId());
+    }
+
+    /**
+     * Gets your self-deafened state.
+     *
+     * @return Whether you are self-deafened.
+     */
+    default boolean areYouSelfDeafened() {
+        return isSelfDeafened(getApi().getYourself());
+    }
+
+    /**
+     * Gets the self-deafened state of the user with the given id.
+     *
+     * @param userId The id of the user to check.
+     * @return Whether the user with the given id is self-deafened.
+     */
+    boolean isSelfDeafened(long userId);
+
+    /**
+     * Gets the self-deafened state of the given user.
+     *
+     * @param user The user to check.
+     * @return Whether the given user is self-deafened.
+     */
+    default boolean isSelfDeafened(User user) {
+        return isSelfDeafened(user.getId());
+    }
+
+    /**
+     * Gets your muted state.
+     *
+     * @return Whether you are muted.
+     */
+    default boolean areYouMuted() {
+        return isMuted(getApi().getYourself());
+    }
+
+    /**
+     * Gets the muted state of the user with the given id.
+     *
+     * @param userId The id of the user to check.
+     * @return Whether the user with the given id is muted.
+     */
+    boolean isMuted(long userId);
+
+    /**
+     * Gets the muted state of the given user.
+     *
+     * @param user The user to check.
+     * @return Whether the given user is muted.
+     */
+    default boolean isMuted(User user) {
+        return isMuted(user.getId());
+    }
+
+    /**
+     * Gets your deafened state.
+     *
+     * @return Whether you are deafened.
+     */
+    default boolean areYouDeafened() {
+        return isDeafened(getApi().getYourself());
+    }
+
+    /**
+     * Gets the deafened state of the user with the given id.
+     *
+     * @param userId The id of the user to check.
+     * @return Whether the user with the given id is deafened.
+     */
+    boolean isDeafened(long userId);
+
+    /**
+     * Gets the deafened state of the given user.
+     *
+     * @param user The user to check.
+     * @return Whether the given user is deafened.
+     */
+    default boolean isDeafened(User user) {
+        return isDeafened(user.getId());
+    }
 
     /**
      * Gets the display name of the user on this server.
@@ -449,6 +562,19 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
     List<Role> getRoles();
 
     /**
+     * Gets a sorted list (by position) with all roles of the user in the server.
+     *
+     * @param user The user.
+     * @return A sorted list (by position) with all roles of the user in the server.
+     */
+    default List<Role> getRoles(User user) {
+        return Collections.unmodifiableList(
+                getRoles().stream()
+                        .filter(role -> role.getUsers().contains(user))
+                        .collect(Collectors.toList()));
+    }
+
+    /**
      * Gets a role by its id.
      *
      * @param id The id of the role.
@@ -508,27 +634,14 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
     }
 
     /**
-     * Gets a sorted list (by position) with all roles of the user in the server.
-     *
-     * @param user The user.
-     * @return A sorted list (by position) with all roles of the user in the server.
-     */
-    default List<Role> getRolesOf(User user) {
-        return Collections.unmodifiableList(
-                getRoles().stream()
-                        .filter(role -> role.getUsers().contains(user))
-                        .collect(Collectors.toList()));
-    }
-
-    /**
      * Gets the permissions of a user.
      *
      * @param user The user.
      * @return The permissions of the user.
      */
-    default Permissions getPermissionsOf(User user) {
+    default Permissions getPermissions(User user) {
         PermissionsBuilder builder = new PermissionsBuilder();
-        getAllowedPermissionsOf(user).forEach(type -> builder.setState(type, PermissionState.ALLOWED));
+        getAllowedPermissions(user).forEach(type -> builder.setState(type, PermissionState.ALLOWED));
         return builder.build();
     }
 
@@ -541,12 +654,12 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
      * @param user The user.
      * @return The allowed permissions of the given user.
      */
-    default Collection<PermissionType> getAllowedPermissionsOf(User user) {
+    default Collection<PermissionType> getAllowedPermissions(User user) {
         Collection<PermissionType> allowed = new HashSet<>();
         if (getOwner() == user) {
             allowed.addAll(Arrays.asList(PermissionType.values()));
         } else {
-            getRolesOf(user).forEach(role -> allowed.addAll(role.getAllowedPermissions()));
+            getRoles(user).forEach(role -> allowed.addAll(role.getAllowedPermissions()));
         }
         return Collections.unmodifiableCollection(allowed);
     }
@@ -557,12 +670,12 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
      * @param user The user.
      * @return The unset permissions of the given user.
      */
-    default Collection<PermissionType> getUnsetPermissionsOf(User user) {
+    default Collection<PermissionType> getUnsetPermissions(User user) {
         if (getOwner() == user) {
             return Collections.emptySet();
         }
         Collection<PermissionType> unset = new HashSet<>();
-        getRolesOf(user).forEach(role -> unset.addAll(role.getUnsetPermissions()));
+        getRoles(user).forEach(role -> unset.addAll(role.getUnsetPermissions()));
         return Collections.unmodifiableCollection(unset);
     }
 
@@ -572,10 +685,10 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
      * @param user The user to check.
      * @param type The permission type(s) to check.
      * @return Whether the user has all given permissions or not.
-     * @see #getAllowedPermissionsOf(User)
+     * @see #getAllowedPermissions(User)
      */
     default boolean hasPermissions(User user, PermissionType... type) {
-        return getAllowedPermissionsOf(user).containsAll(Arrays.asList(type));
+        return getAllowedPermissions(user).containsAll(Arrays.asList(type));
     }
 
     /**
@@ -584,10 +697,10 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
      * @param user The user to check.
      * @param type The permission type(s) to check.
      * @return Whether the user has any of the given permissions or not.
-     * @see #getAllowedPermissionsOf(User)
+     * @see #getAllowedPermissions(User)
      */
     default boolean hasAnyPermission(User user, PermissionType... type) {
-        return getAllowedPermissionsOf(user).stream()
+        return getAllowedPermissions(user).stream()
                 .anyMatch(allowedPermissionType -> Arrays.stream(type).anyMatch(allowedPermissionType::equals));
     }
 
@@ -611,7 +724,7 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
 
     /**
      * Updates the name of the server.
-     * 
+     *
      * <p>If you want to update several settings at once, it's recommended to use the
      * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
@@ -624,7 +737,7 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
 
     /**
      * Updates the region of the server.
-     * 
+     *
      * <p>If you want to update several settings at once, it's recommended to use the
      * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
@@ -637,7 +750,7 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
 
     /**
      * Updates the explicit content filter level of the server.
-     * 
+     *
      * <p>If you want to update several settings at once, it's recommended to use the
      * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
@@ -651,7 +764,7 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
 
     /**
      * Updates the verification level of the server.
-     * 
+     *
      * <p>If you want to update several settings at once, it's recommended to use the
      * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
@@ -664,7 +777,7 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
 
     /**
      * Updates the default message notification level of the server.
-     * 
+     *
      * <p>If you want to update several settings at once, it's recommended to use the
      * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
@@ -678,7 +791,7 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
 
     /**
      * Updates the afk channel of the server.
-     * 
+     *
      * <p>If you want to update several settings at once, it's recommended to use the
      * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
@@ -691,7 +804,7 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
 
     /**
      * Removes the afk channel of the server.
-     * 
+     *
      * <p>If you want to update several settings at once, it's recommended to use the
      * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
@@ -703,7 +816,7 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
 
     /**
      * Updates the afk timeout of the server.
-     * 
+     *
      * <p>If you want to update several settings at once, it's recommended to use the
      * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
@@ -717,7 +830,7 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
     /**
      * Updates the icon of the server.
      * This method assumes the file type is "png"!
-     * 
+     *
      * <p>If you want to update several settings at once, it's recommended to use the
      * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
@@ -730,7 +843,7 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
 
     /**
      * Updates the icon of the server.
-     * 
+     *
      * <p>If you want to update several settings at once, it's recommended to use the
      * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
@@ -744,7 +857,7 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
 
     /**
      * Updates the icon of the server.
-     * 
+     *
      * <p>If you want to update several settings at once, it's recommended to use the
      * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
@@ -757,7 +870,7 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
 
     /**
      * Updates the icon of the server.
-     * 
+     *
      * <p>If you want to update several settings at once, it's recommended to use the
      * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
@@ -770,7 +883,7 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
 
     /**
      * Updates the icon of the server.
-     * 
+     *
      * <p>If you want to update several settings at once, it's recommended to use the
      * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
@@ -784,7 +897,7 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
     /**
      * Updates the icon of the server.
      * This method assumes the file type is "png"!
-     * 
+     *
      * <p>If you want to update several settings at once, it's recommended to use the
      * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
@@ -797,7 +910,7 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
 
     /**
      * Updates the icon of the server.
-     * 
+     *
      * <p>If you want to update several settings at once, it's recommended to use the
      * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
@@ -812,7 +925,7 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
     /**
      * Updates the icon of the server.
      * This method assumes the file type is "png"!
-     * 
+     *
      * <p>If you want to update several settings at once, it's recommended to use the
      * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
@@ -825,7 +938,7 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
 
     /**
      * Updates the icon of the server.
-     * 
+     *
      * <p>If you want to update several settings at once, it's recommended to use the
      * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
@@ -839,7 +952,7 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
 
     /**
      * Removes the icon of the server.
-     * 
+     *
      * <p>If you want to update several settings at once, it's recommended to use the
      * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
@@ -852,7 +965,7 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
     /**
      * Updates the owner of the server.
      * You must be the owner of this server in order to transfer it!
-     * 
+     *
      * <p>If you want to update several settings at once, it's recommended to use the
      * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
@@ -866,7 +979,7 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
     /**
      * Updates the splash of the server.
      * This method assumes the file type is "png"!
-     * 
+     *
      * <p>If you want to update several settings at once, it's recommended to use the
      * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
@@ -1026,43 +1139,57 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
     /**
      * Changes the nickname of the given user.
      *
+     * <p>If you want to update several settings at once, it's recommended to use the
+     * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
+     *
      * @param user The user.
      * @param nickname The new nickname of the user.
      * @return A future to check if the update was successful.
      */
     default CompletableFuture<Void> updateNickname(User user, String nickname) {
-        return updateNickname(user, nickname, null);
+        return createUpdater().setNickname(user, nickname).update();
     }
 
     /**
      * Changes the nickname of the given user.
+     *
+     * <p>If you want to update several settings at once, it's recommended to use the
+     * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
      * @param user The user.
      * @param nickname The new nickname of the user.
      * @param reason The audit log reason for this update.
      * @return A future to check if the update was successful.
      */
-    CompletableFuture<Void> updateNickname(User user, String nickname, String reason);
+    default CompletableFuture<Void> updateNickname(User user, String nickname, String reason) {
+        return createUpdater().setNickname(user, nickname).setAuditLogReason(reason).update();
+    }
 
     /**
      * Removes the nickname of the given user.
+     *
+     * <p>If you want to update several settings at once, it's recommended to use the
+     * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
      * @param user The user.
      * @return A future to check if the update was successful.
      */
     default CompletableFuture<Void> resetNickname(User user) {
-        return updateNickname(user, null);
+        return createUpdater().setNickname(user, null).update();
     }
 
     /**
      * Removes the nickname of the given user.
+     *
+     * <p>If you want to update several settings at once, it's recommended to use the
+     * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
      *
      * @param user The user.
      * @param reason The audit log reason for this update.
      * @return A future to check if the update was successful.
      */
     default CompletableFuture<Void> resetNickname(User user, String reason) {
-        return updateNickname(user, null, reason);
+        return createUpdater().setNickname(user, null).setAuditLogReason(reason).update();
     }
 
     /**
@@ -1137,24 +1264,39 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
      * Updates the roles of a server member.
      * This will replace the roles of the server member with a provided collection.
      *
+     * <p>If you want to update several settings at once, it's recommended to use the
+     * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
+     *
      * @param user The user to update the roles of.
      * @param roles The collection of roles to replace the user's roles.
      * @return A future to check if the update was successful.
      */
     default CompletableFuture<Void> updateRoles(User user, Collection<Role> roles) {
-        return updateRoles(user, roles, null);
+        return createUpdater()
+                .removeAllRolesFromUser(user)
+                .addRolesToUser(user, roles)
+                .update();
     }
 
     /**
      * Updates the roles of a server member.
      * This will replace the roles of the server member with a provided collection.
      *
+     * <p>If you want to update several settings at once, it's recommended to use the
+     * {@link ServerUpdater} from {@link #createUpdater()} which provides a better performance!
+     *
      * @param user The user to update the roles of.
      * @param roles The collection of roles to replace the user's roles.
      * @param reason The audit log reason for this update.
      * @return A future to check if the update was successful.
      */
-    CompletableFuture<Void> updateRoles(User user, Collection<Role> roles, String reason);
+    default CompletableFuture<Void> updateRoles(User user, Collection<Role> roles, String reason) {
+        return createUpdater()
+                .removeAllRolesFromUser(user)
+                .addRolesToUser(user, roles)
+                .setAuditLogReason(reason)
+                .update();
+    }
 
     /**
      * Reorders the roles of the server.
@@ -1174,6 +1316,195 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
      * @return A future to check if the update was successful.
      */
     CompletableFuture<Void> reorderRoles(List<Role> roles, String reason);
+
+    /**
+     * Moves yourself to the given channel on the server.
+     *
+     * @param channel The channel to move the user to.
+     * @return A future to check if the move was successful.
+     */
+    default CompletableFuture<Void> moveYourself(ServerVoiceChannel channel) {
+        return moveUser(getApi().getYourself(), channel);
+    }
+
+    /**
+     * Moves the given user to the given channel on the server.
+     *
+     * @param user The user to move.
+     * @param channel The channel to move the user to.
+     * @return A future to check if the move was successful.
+     */
+    default CompletableFuture<Void> moveUser(User user, ServerVoiceChannel channel) {
+        return createUpdater().setVoiceChannel(user, channel).update();
+    }
+
+    /**
+     * Mutes yourself locally for the server.
+     *
+     * <p>This cannot be undone by other users. If you want to mute yourself server-sidely, so that others can unmute
+     * you, use {@link #muteYourself()}, {@link #muteUser(User)} or {@link #muteUser(User, String)}.
+     *
+     * @see #muteYourself()
+     * @see #muteUser(User)
+     * @see #muteUser(User, String)
+     */
+    void selfMute();
+
+    /**
+     * Unmutes yourself locally for the server.
+     *
+     * <p>This cannot be undone by other users. If you want to unmute yourself server-sidely, so that others can
+     * mute you, use {@link #unmuteYourself()}, {@link #unmuteUser(User)} or {@link #unmuteUser(User, String)}.
+     *
+     * @see #unmuteYourself()
+     * @see #unmuteUser(User)
+     * @see #unmuteUser(User, String)
+     */
+    void selfUnmute();
+
+    /**
+     * Mutes yourself on the server.
+     *
+     * @return A future to check if the mute was successful.
+     */
+    default CompletableFuture<Void> muteYourself() {
+        return muteUser(getApi().getYourself());
+    }
+
+    /**
+     * Unmutes yourself on the server.
+     *
+     * @return A future to check if the unmute was successful.
+     */
+    default CompletableFuture<Void> unmuteYourself() {
+        return unmuteUser(getApi().getYourself());
+    }
+
+    /**
+     * Mutes the given user on the server.
+     *
+     * @param user The user to mute.
+     * @return A future to check if the mute was successful.
+     */
+    default CompletableFuture<Void> muteUser(User user) {
+        return createUpdater().setMuted(user, true).update();
+    }
+
+    /**
+     * Mutes the given user on the server.
+     *
+     * @param user The user to mute.
+     * @param reason The audit log reason for this action.
+     * @return A future to check if the mute was successful.
+     */
+    default CompletableFuture<Void> muteUser(User user, String reason) {
+        return createUpdater().setMuted(user, true).setAuditLogReason(reason).update();
+    }
+
+    /**
+     * Unmutes the given user on the server.
+     *
+     * @param user The user to unmute.
+     * @return A future to check if the unmute was successful.
+     */
+    default CompletableFuture<Void> unmuteUser(User user) {
+        return createUpdater().setMuted(user, false).update();
+    }
+
+    /**
+     * Unmutes the given user on the server.
+     *
+     * @param user The user to unmute.
+     * @param reason The audit log reason for this action.
+     * @return A future to check if the unmute was successful.
+     */
+    default CompletableFuture<Void> unmuteUser(User user, String reason) {
+        return createUpdater().setMuted(user, false).setAuditLogReason(reason).update();
+    }
+
+    /**
+     * Deafens yourself locally for the server.
+     *
+     * <p>This cannot be undone by other users. If you want to deafen yourself server-sidely, so that others can
+     * undeafen you, use {@link #deafenYourself()}, {@link #deafenUser(User)} or {@link #deafenUser(User, String)}.
+     *
+     * @see #deafenYourself()
+     * @see #deafenUser(User)
+     * @see #deafenUser(User, String)
+     */
+    void selfDeafen();
+
+    /**
+     * Undeafens yourself locally for the server.
+     *
+     * <p>This cannot be undone by other users. If you want to undeafen yourself server-sidely, so that others can
+     * deafen you, use {@link #undeafenYourself()}, {@link #undeafenUser(User)} or {@link #undeafenUser(User, String)}.
+     *
+     * @see #undeafenYourself()
+     * @see #undeafenUser(User)
+     * @see #undeafenUser(User, String)
+     */
+    void selfUndeafen();
+
+    /**
+     * Deafens yourself on the server.
+     *
+     * @return A future to check if the deafen was successful.
+     */
+    default CompletableFuture<Void> deafenYourself() {
+        return deafenUser(getApi().getYourself());
+    }
+
+    /**
+     * Undeafens yourself on the server.
+     *
+     * @return A future to check if the undeafen was successful.
+     */
+    default CompletableFuture<Void> undeafenYourself() {
+        return undeafenUser(getApi().getYourself());
+    }
+
+    /**
+     * Deafens the given user on the server.
+     *
+     * @param user The user to deafen.
+     * @return A future to check if the deafen was successful.
+     */
+    default CompletableFuture<Void> deafenUser(User user) {
+        return createUpdater().setDeafened(user, true).update();
+    }
+
+    /**
+     * Deafens the given user on the server.
+     *
+     * @param user The user to deafen.
+     * @param reason The audit log reason for this action.
+     * @return A future to check if the deafen was successful.
+     */
+    default CompletableFuture<Void> deafenUser(User user, String reason) {
+        return createUpdater().setDeafened(user, true).setAuditLogReason(reason).update();
+    }
+
+    /**
+     * Undeafens the given user on the server.
+     *
+     * @param user The user to undeafen.
+     * @return A future to check if the undeafen was successful.
+     */
+    default CompletableFuture<Void> undeafenUser(User user) {
+        return createUpdater().setDeafened(user, false).update();
+    }
+
+    /**
+     * Undeafens the given user on the server.
+     *
+     * @param user The user to undeafen.
+     * @param reason The audit log reason for this action.
+     * @return A future to check if the undeafen was successful.
+     */
+    default CompletableFuture<Void> undeafenUser(User user, String reason) {
+        return createUpdater().setDeafened(user, false).setAuditLogReason(reason).update();
+    }
 
     /**
      * Kicks the given user from the server.
@@ -1354,7 +1685,7 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
      * @return Whether the user has the permission or not.
      */
     default boolean hasPermission(User user, PermissionType permission) {
-        return getAllowedPermissionsOf(user).contains(permission);
+        return getAllowedPermissions(user).contains(permission);
     }
 
     /**
@@ -1734,8 +2065,8 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
      * @param user The user.
      * @return The highest role of the given user.
      */
-    default Optional<Role> getHighestRoleOf(User user) {
-        List<Role> roles = getRolesOf(user);
+    default Optional<Role> getHighestRole(User user) {
+        List<Role> roles = getRoles(user);
         if (roles.isEmpty()) {
             return Optional.empty();
         }
@@ -1848,6 +2179,69 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
     }
 
     /**
+     * Checks if the given user can mute members on the server.
+     *
+     * @param user The user to check.
+     * @return Whether the given user can mute members or not.
+     */
+    default boolean canMuteMembers(User user) {
+        return hasAnyPermission(user,
+                                PermissionType.ADMINISTRATOR,
+                                PermissionType.VOICE_MUTE_MEMBERS);
+    }
+
+    /**
+     * Checks if the user of the connected account can mute members on the server.
+     *
+     * @return Whether the user of the connected account can mute members or not.
+     */
+    default boolean canYouMuteMembers() {
+        return canMuteMembers(getApi().getYourself());
+    }
+
+    /**
+     * Checks if the given user can deafen members on the server.
+     *
+     * @param user The user to check.
+     * @return Whether the given user can deafen members or not.
+     */
+    default boolean canDeafenMembers(User user) {
+        return hasAnyPermission(user,
+                                PermissionType.ADMINISTRATOR,
+                                PermissionType.VOICE_DEAFEN_MEMBERS);
+    }
+
+    /**
+     * Checks if the user of the connected account can deafen members on the server.
+     *
+     * @return Whether the user of the connected account can deafen members or not.
+     */
+    default boolean canYouDeafenMembers() {
+        return canDeafenMembers(getApi().getYourself());
+    }
+
+    /**
+     * Checks if the given user can move members on the server.
+     *
+     * @param user The user to check.
+     * @return Whether the given user can move members or not.
+     */
+    default boolean canMoveMembers(User user) {
+        return hasAnyPermission(user,
+                                PermissionType.ADMINISTRATOR,
+                                PermissionType.VOICE_MOVE_MEMBERS);
+    }
+
+    /**
+     * Checks if the user of the connected account can move members on the server.
+     *
+     * @return Whether the user of the connected account can move members or not.
+     */
+    default boolean canYouMoveMembers() {
+        return canMoveMembers(getApi().getYourself());
+    }
+
+    /**
      * Checks if the given user can manage emojis on the server.
      *
      * @param user The user to check.
@@ -1943,8 +2337,8 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
         if (canKickUsers(user)) {
             return false;
         }
-        Optional<Role> ownRole = getHighestRoleOf(user);
-        Optional<Role> otherRole = getHighestRoleOf(userToKick);
+        Optional<Role> ownRole = getHighestRole(user);
+        Optional<Role> otherRole = getHighestRole(userToKick);
         return ownRole.isPresent() && (!otherRole.isPresent() || ownRole.get().isHigherThan(otherRole.get()));
     }
 
@@ -1992,8 +2386,8 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
         if (canBanUsers(user)) {
             return false;
         }
-        Optional<Role> ownRole = getHighestRoleOf(user);
-        Optional<Role> otherRole = getHighestRoleOf(userToBan);
+        Optional<Role> ownRole = getHighestRole(user);
+        Optional<Role> otherRole = getHighestRole(userToBan);
         return ownRole.isPresent() && (!otherRole.isPresent() || ownRole.get().isHigherThan(otherRole.get()));
     }
 
@@ -2720,6 +3114,67 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
     List<UserChangeNicknameListener> getUserChangeNicknameListeners();
 
     /**
+     * Adds a listener, which listens to user self-muted changes in this server.
+     *
+     * @param listener The listener to add.
+     * @return The manager of the listener.
+     */
+    ListenerManager<UserChangeSelfMutedListener> addUserChangeSelfMutedListener(UserChangeSelfMutedListener listener);
+
+    /**
+     * Gets a list with all registered user change self-muted listeners.
+     *
+     * @return A list with all registered user change self-muted listeners.
+     */
+    List<UserChangeSelfMutedListener> getUserChangeSelfMutedListeners();
+
+    /**
+     * Adds a listener, which listens to user self-deafened changes in this server.
+     *
+     * @param listener The listener to add.
+     * @return The manager of the listener.
+     */
+    ListenerManager<UserChangeSelfDeafenedListener> addUserChangeSelfDeafenedListener(
+            UserChangeSelfDeafenedListener listener);
+
+    /**
+     * Gets a list with all registered user change self-deafened listeners.
+     *
+     * @return A list with all registered user change self-deafened listeners.
+     */
+    List<UserChangeSelfDeafenedListener> getUserChangeSelfDeafenedListeners();
+
+    /**
+     * Adds a listener, which listens to user muted changes in this server.
+     *
+     * @param listener The listener to add.
+     * @return The manager of the listener.
+     */
+    ListenerManager<UserChangeMutedListener> addUserChangeMutedListener(UserChangeMutedListener listener);
+
+    /**
+     * Gets a list with all registered user change muted listeners.
+     *
+     * @return A list with all registered user change muted listeners.
+     */
+    List<UserChangeMutedListener> getUserChangeMutedListeners();
+
+    /**
+     * Adds a listener, which listens to user deafened changes in this server.
+     *
+     * @param listener The listener to add.
+     * @return The manager of the listener.
+     */
+    ListenerManager<UserChangeDeafenedListener> addUserChangeDeafenedListener(UserChangeDeafenedListener listener);
+
+    /**
+     * Gets a list with all registered user change deafened listeners.
+     *
+     * @return A list with all registered user change deafened listeners.
+     */
+    List<UserChangeDeafenedListener> getUserChangeDeafenedListeners();
+
+    /**
      * Adds a listener, which listens to server text channel topic changes in this server.
      *
      * @param listener The listener to add.
@@ -2934,6 +3389,21 @@ public interface Server extends DiscordEntity, UpdatableFromCache<Server> {
      * @return A list with all registered cached message unpin listeners.
      */
     List<CachedMessageUnpinListener> getCachedMessageUnpinListeners();
+
+    /**
+     *Adds a {@link VoiceServerUpdateListener}.
+     *
+     *@param listener The listener to add.
+     *@return The manager of the listener.
+     */
+    ListenerManager<VoiceServerUpdateListener> addVoiceServerUpdateListener(VoiceServerUpdateListener listener);
+
+    /**
+     *Gets a list with all {@link VoiceServerUpdateListener}s.
+     *
+     *@return A list with all registered {@code VoiceServerUpdateListener}s.
+     */
+    List<VoiceServerUpdateListener> getVoiceServerUpdateListeners();
 
     /**
      * Adds a listener that implements one or more {@code ServerAttachableListener}s.

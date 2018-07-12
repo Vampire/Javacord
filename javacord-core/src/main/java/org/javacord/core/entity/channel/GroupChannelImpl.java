@@ -90,7 +90,8 @@ public class GroupChannelImpl
         }
 
         this.messageCache = new MessageCacheImpl(
-                api, api.getDefaultMessageCacheCapacity(), api.getDefaultMessageCacheStorageTimeInSeconds());
+                api, api.getDefaultMessageCacheCapacity(), api.getDefaultMessageCacheStorageTimeInSeconds(),
+                api.isDefaultAutomaticMessageCacheCleanupEnabled());
 
         id = Long.parseLong(data.get("id").asText());
         name = data.has("name") && !data.get("name").isNull() ? data.get("name").asText() : null;
