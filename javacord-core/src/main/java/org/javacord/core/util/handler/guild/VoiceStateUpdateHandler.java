@@ -6,19 +6,12 @@ import org.javacord.api.entity.channel.GroupChannel;
 import org.javacord.api.entity.channel.PrivateChannel;
 import org.javacord.api.entity.channel.ServerVoiceChannel;
 import org.javacord.api.entity.server.Server;
-import org.javacord.api.entity.user.User;
 import org.javacord.api.event.channel.server.voice.ServerVoiceChannelMemberJoinEvent;
 import org.javacord.api.event.channel.server.voice.ServerVoiceChannelMemberLeaveEvent;
 import org.javacord.api.event.user.UserChangeDeafenedEvent;
 import org.javacord.api.event.user.UserChangeMutedEvent;
 import org.javacord.api.event.user.UserChangeSelfDeafenedEvent;
 import org.javacord.api.event.user.UserChangeSelfMutedEvent;
-import org.javacord.api.listener.channel.server.voice.ServerVoiceChannelMemberJoinListener;
-import org.javacord.api.listener.channel.server.voice.ServerVoiceChannelMemberLeaveListener;
-import org.javacord.api.listener.user.UserChangeDeafenedListener;
-import org.javacord.api.listener.user.UserChangeMutedListener;
-import org.javacord.api.listener.user.UserChangeSelfDeafenedListener;
-import org.javacord.api.listener.user.UserChangeSelfMutedListener;
 import org.javacord.core.entity.channel.GroupChannelImpl;
 import org.javacord.core.entity.channel.PrivateChannelImpl;
 import org.javacord.core.entity.channel.ServerVoiceChannelImpl;
@@ -29,10 +22,9 @@ import org.javacord.core.event.user.UserChangeDeafenedEventImpl;
 import org.javacord.core.event.user.UserChangeMutedEventImpl;
 import org.javacord.core.event.user.UserChangeSelfDeafenedEventImpl;
 import org.javacord.core.event.user.UserChangeSelfMutedEventImpl;
+import org.javacord.core.listener.EventDispatchUtil;
 import org.javacord.core.util.gateway.PacketHandler;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -142,16 +134,13 @@ public class VoiceStateUpdateHandler extends PacketHandler {
         ServerVoiceChannelMemberJoinEvent event = new ServerVoiceChannelMemberJoinEventImpl(
                 userId, newChannel, oldChannel);
 
-        List<ServerVoiceChannelMemberJoinListener> listeners = new ArrayList<>();
-        listeners.addAll(api.getObjectListeners(User.class, userId, ServerVoiceChannelMemberJoinListener.class));
-        listeners.addAll(newChannel.getServerVoiceChannelMemberJoinListeners());
-        if (server != null) {
-            listeners.addAll(server.getServerVoiceChannelMemberJoinListeners());
-        }
-        listeners.addAll(api.getServerVoiceChannelMemberJoinListeners());
-
-        api.getEventDispatcher().dispatchEvent(server,
-                listeners, listener -> listener.onServerVoiceChannelMemberJoin(event));
+        EventDispatchUtil.dispatchToServerVoiceChannelMemberJoinListeners(
+                server,
+                server,
+                newChannel,
+                userId,
+                api,
+                listener -> listener.onServerVoiceChannelMemberJoin(event));
     }
 
     private void dispatchServerVoiceChannelMemberLeaveEvent(
@@ -159,16 +148,13 @@ public class VoiceStateUpdateHandler extends PacketHandler {
         ServerVoiceChannelMemberLeaveEvent event = new ServerVoiceChannelMemberLeaveEventImpl(
                 userId, newChannel, oldChannel);
 
-        List<ServerVoiceChannelMemberLeaveListener> listeners = new ArrayList<>();
-        listeners.addAll(api.getObjectListeners(User.class, userId, ServerVoiceChannelMemberLeaveListener.class));
-        listeners.addAll(oldChannel.getServerVoiceChannelMemberLeaveListeners());
-        if (server != null) {
-            listeners.addAll(server.getServerVoiceChannelMemberLeaveListeners());
-        }
-        listeners.addAll(api.getServerVoiceChannelMemberLeaveListeners());
-
-        api.getEventDispatcher().dispatchEvent(server,
-                listeners, listener -> listener.onServerVoiceChannelMemberLeave(event));
+        EventDispatchUtil.dispatchToServerVoiceChannelMemberLeaveListeners(
+                server,
+                server,
+                oldChannel,
+                userId,
+                api,
+                listener -> listener.onServerVoiceChannelMemberLeave(event));
     }
 
     private void dispatchUserChangeSelfMutedEvent(
@@ -176,13 +162,12 @@ public class VoiceStateUpdateHandler extends PacketHandler {
         UserChangeSelfMutedEvent event =
                 new UserChangeSelfMutedEventImpl(userId, server, newSelfMuted, oldSelfMuted);
 
-        List<UserChangeSelfMutedListener> listeners = new ArrayList<>();
-        listeners.addAll(api.getObjectListeners(User.class, userId, UserChangeSelfMutedListener.class));
-        listeners.addAll(server.getUserChangeSelfMutedListeners());
-        listeners.addAll(api.getUserChangeSelfMutedListeners());
-
-        api.getEventDispatcher().dispatchEvent(server,
-                listeners, listener -> listener.onUserChangeSelfMuted(event));
+        EventDispatchUtil.dispatchToUserChangeSelfMutedListeners(
+                server,
+                server,
+                userId,
+                api,
+                listener -> listener.onUserChangeSelfMuted(event));
     }
 
     private void dispatchUserChangeSelfDeafenedEvent(
@@ -190,26 +175,24 @@ public class VoiceStateUpdateHandler extends PacketHandler {
         UserChangeSelfDeafenedEvent event =
                 new UserChangeSelfDeafenedEventImpl(userId, server, newSelfDeafened, oldSelfDeafened);
 
-        List<UserChangeSelfDeafenedListener> listeners = new ArrayList<>();
-        listeners.addAll(api.getObjectListeners(User.class, userId, UserChangeSelfDeafenedListener.class));
-        listeners.addAll(server.getUserChangeSelfDeafenedListeners());
-        listeners.addAll(api.getUserChangeSelfDeafenedListeners());
-
-        api.getEventDispatcher().dispatchEvent(server,
-                listeners, listener -> listener.onUserChangeSelfDeafened(event));
+        EventDispatchUtil.dispatchToUserChangeSelfDeafenedListeners(
+                server,
+                server,
+                userId,
+                api,
+                listener -> listener.onUserChangeSelfDeafened(event));
     }
 
     private void dispatchUserChangeMutedEvent(Long userId, Server server, boolean newMuted, boolean oldMuted) {
         UserChangeMutedEvent event =
                 new UserChangeMutedEventImpl(userId, server, newMuted, oldMuted);
 
-        List<UserChangeMutedListener> listeners = new ArrayList<>();
-        listeners.addAll(api.getObjectListeners(User.class, userId, UserChangeMutedListener.class));
-        listeners.addAll(server.getUserChangeMutedListeners());
-        listeners.addAll(api.getUserChangeMutedListeners());
-
-        api.getEventDispatcher().dispatchEvent(server,
-                listeners, listener -> listener.onUserChangeMuted(event));
+        EventDispatchUtil.dispatchToUserChangeMutedListeners(
+                server,
+                server,
+                userId,
+                api,
+                listener -> listener.onUserChangeMuted(event));
     }
 
     private void dispatchUserChangeDeafenedEvent(
@@ -217,13 +200,12 @@ public class VoiceStateUpdateHandler extends PacketHandler {
         UserChangeDeafenedEvent event =
                 new UserChangeDeafenedEventImpl(userId, server, newDeafened, oldDeafened);
 
-        List<UserChangeDeafenedListener> listeners = new ArrayList<>();
-        listeners.addAll(api.getObjectListeners(User.class, userId, UserChangeDeafenedListener.class));
-        listeners.addAll(server.getUserChangeDeafenedListeners());
-        listeners.addAll(api.getUserChangeDeafenedListeners());
-
-        api.getEventDispatcher().dispatchEvent(server,
-                listeners, listener -> listener.onUserChangeDeafened(event));
+        EventDispatchUtil.dispatchToUserChangeDeafenedListeners(
+                server,
+                server,
+                userId,
+                api,
+                listener -> listener.onUserChangeDeafened(event));
     }
 
 }
