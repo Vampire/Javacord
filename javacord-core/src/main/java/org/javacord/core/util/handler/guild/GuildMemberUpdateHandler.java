@@ -36,80 +36,81 @@ public class GuildMemberUpdateHandler extends PacketHandler {
 
     @Override
     public void handle(JsonNode packet) {
-        api.getAllServerById(packet.get("guild_id").asLong()).map(server -> (ServerImpl) server).ifPresent(server -> {
-            User user = api.getOrCreateUser(packet.get("user"));
-            if (packet.has("nick")) {
-                String newNickname = packet.get("nick").asText(null);
-                String oldNickname = server.getNickname(user).orElse(null);
-                if (!Objects.deepEquals(newNickname, oldNickname)) {
-                    server.setNickname(user, newNickname);
+        api.getPossiblyUnreadyServerById(packet.get("guild_id").asLong()).map(server -> (ServerImpl) server)
+                .ifPresent(server -> {
+                    User user = api.getOrCreateUser(packet.get("user"));
+                    if (packet.has("nick")) {
+                        String newNickname = packet.get("nick").asText(null);
+                        String oldNickname = server.getNickname(user).orElse(null);
+                        if (!Objects.deepEquals(newNickname, oldNickname)) {
+                            server.setNickname(user, newNickname);
 
-                    UserChangeNicknameEvent event =
-                            new UserChangeNicknameEventImpl(user, server, newNickname, oldNickname);
+                            UserChangeNicknameEvent event =
+                                    new UserChangeNicknameEventImpl(user, server, newNickname, oldNickname);
 
-                    EventDispatchUtil.dispatchToUserChangeNicknameListeners(
-                            server,
-                            server,
-                            user,
-                            api,
-                            listener -> listener.onUserChangeNickname(event));
-                }
-            }
-
-            if (packet.has("roles")) {
-                JsonNode jsonRoles = packet.get("roles");
-                Collection<Role> newRoles = new HashSet<>();
-                Collection<Role> oldRoles = server.getRoles(user);
-                Collection<Role> intersection = new HashSet<>();
-                for (JsonNode roleIdJson : jsonRoles) {
-                    api.getRoleById(roleIdJson.asText())
-                            .map(role -> {
-                                newRoles.add(role);
-                                return role;
-                            })
-                            .filter(oldRoles::contains)
-                            .ifPresent(intersection::add);
-                }
-
-                // Added roles
-                Collection<Role> addedRoles = new ArrayList<>(newRoles);
-                addedRoles.removeAll(intersection);
-                for (Role role : addedRoles) {
-                    if (role.isEveryoneRole()) {
-                        continue;
+                            EventDispatchUtil.dispatchToUserChangeNicknameListeners(
+                                    server,
+                                    server,
+                                    user,
+                                    api,
+                                    listener -> listener.onUserChangeNickname(event));
+                        }
                     }
-                    ((RoleImpl) role).addUserToCache(user);
-                    UserRoleAddEvent event = new UserRoleAddEventImpl(role, user);
 
-                    EventDispatchUtil.dispatchToUserRoleAddListeners(
-                            role.getServer(),
-                            role,
-                            role.getServer(),
-                            user,
-                            api,
-                            listener -> listener.onUserRoleAdd(event));
-                }
+                    if (packet.has("roles")) {
+                        JsonNode jsonRoles = packet.get("roles");
+                        Collection<Role> newRoles = new HashSet<>();
+                        Collection<Role> oldRoles = server.getRoles(user);
+                        Collection<Role> intersection = new HashSet<>();
+                        for (JsonNode roleIdJson : jsonRoles) {
+                            api.getRoleById(roleIdJson.asText())
+                                    .map(role -> {
+                                        newRoles.add(role);
+                                        return role;
+                                    })
+                                    .filter(oldRoles::contains)
+                                    .ifPresent(intersection::add);
+                        }
 
-                // Removed roles
-                Collection<Role> removedRoles = new ArrayList<>(oldRoles);
-                removedRoles.removeAll(intersection);
-                for (Role role : removedRoles) {
-                    if (role.isEveryoneRole()) {
-                        continue;
+                        // Added roles
+                        Collection<Role> addedRoles = new ArrayList<>(newRoles);
+                        addedRoles.removeAll(intersection);
+                        for (Role role : addedRoles) {
+                            if (role.isEveryoneRole()) {
+                                continue;
+                            }
+                            ((RoleImpl) role).addUserToCache(user);
+                            UserRoleAddEvent event = new UserRoleAddEventImpl(role, user);
+
+                            EventDispatchUtil.dispatchToUserRoleAddListeners(
+                                    role.getServer(),
+                                    role,
+                                    role.getServer(),
+                                    user,
+                                    api,
+                                    listener -> listener.onUserRoleAdd(event));
+                        }
+
+                        // Removed roles
+                        Collection<Role> removedRoles = new ArrayList<>(oldRoles);
+                        removedRoles.removeAll(intersection);
+                        for (Role role : removedRoles) {
+                            if (role.isEveryoneRole()) {
+                                continue;
+                            }
+                            ((RoleImpl) role).removeUserFromCache(user);
+                            UserRoleRemoveEvent event = new UserRoleRemoveEventImpl(role, user);
+
+                            EventDispatchUtil.dispatchToUserRoleRemoveListeners(
+                                    role.getServer(),
+                                    role,
+                                    role.getServer(),
+                                    user,
+                                    api,
+                                    listener -> listener.onUserRoleRemove(event));
+                        }
                     }
-                    ((RoleImpl) role).removeUserFromCache(user);
-                    UserRoleRemoveEvent event = new UserRoleRemoveEventImpl(role, user);
-
-                    EventDispatchUtil.dispatchToUserRoleRemoveListeners(
-                            role.getServer(),
-                            role,
-                            role.getServer(),
-                            user,
-                            api,
-                            listener -> listener.onUserRoleRemove(event));
-                }
-            }
-        });
+                });
     }
 
 }

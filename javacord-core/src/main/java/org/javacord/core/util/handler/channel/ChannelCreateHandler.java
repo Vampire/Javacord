@@ -66,7 +66,7 @@ public class ChannelCreateHandler extends PacketHandler {
      */
     private void handleChannelCategory(JsonNode channel) {
         long serverId = channel.get("guild_id").asLong();
-        api.getAllServerById(serverId).ifPresent(server -> {
+        api.getPossiblyUnreadyServerById(serverId).ifPresent(server -> {
             ChannelCategory channelCategory = ((ServerImpl) server).getOrCreateChannelCategory(channel);
             ServerChannelCreateEvent event = new ServerChannelCreateEventImpl(channelCategory);
 
@@ -85,7 +85,7 @@ public class ChannelCreateHandler extends PacketHandler {
      */
     private void handleServerTextChannel(JsonNode channel) {
         long serverId = channel.get("guild_id").asLong();
-        api.getAllServerById(serverId).ifPresent(server -> {
+        api.getPossiblyUnreadyServerById(serverId).ifPresent(server -> {
             ServerTextChannel textChannel = ((ServerImpl) server).getOrCreateServerTextChannel(channel);
             ServerChannelCreateEvent event = new ServerChannelCreateEventImpl(textChannel);
 
@@ -104,7 +104,7 @@ public class ChannelCreateHandler extends PacketHandler {
      */
     private void handleServerVoiceChannel(JsonNode channel) {
         long serverId = channel.get("guild_id").asLong();
-        api.getAllServerById(serverId).ifPresent(server -> {
+        api.getPossiblyUnreadyServerById(serverId).ifPresent(server -> {
             ServerVoiceChannel voiceChannel = ((ServerImpl) server).getOrCreateServerVoiceChannel(channel);
             ServerChannelCreateEvent event = new ServerChannelCreateEventImpl(voiceChannel);
 

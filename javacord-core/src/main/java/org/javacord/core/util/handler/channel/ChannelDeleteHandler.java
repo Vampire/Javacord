@@ -64,7 +64,7 @@ public class ChannelDeleteHandler extends PacketHandler {
     private void handleCategory(JsonNode channelJson) {
         long serverId = channelJson.get("guild_id").asLong();
         long channelId = channelJson.get("id").asLong();
-        api.getAllServerById(serverId).ifPresent(server -> server.getChannelCategoryById(channelId)
+        api.getPossiblyUnreadyServerById(serverId).ifPresent(server -> server.getChannelCategoryById(channelId)
                 .ifPresent(channel -> {
                             dispatchServerChannelDeleteEvent(channel);
                             ((ServerImpl) server).removeChannelFromCache(channel.getId());
@@ -80,10 +80,11 @@ public class ChannelDeleteHandler extends PacketHandler {
     private void handleServerTextChannel(JsonNode channelJson) {
         long serverId = channelJson.get("guild_id").asLong();
         long channelId = channelJson.get("id").asLong();
-        api.getAllServerById(serverId).ifPresent(server -> server.getTextChannelById(channelId).ifPresent(channel -> {
-            dispatchServerChannelDeleteEvent(channel);
-            ((ServerImpl) server).removeChannelFromCache(channel.getId());
-        }));
+        api.getPossiblyUnreadyServerById(serverId)
+                .ifPresent(server -> server.getTextChannelById(channelId).ifPresent(channel -> {
+                    dispatchServerChannelDeleteEvent(channel);
+                    ((ServerImpl) server).removeChannelFromCache(channel.getId());
+                }));
     }
 
     /**
@@ -94,10 +95,11 @@ public class ChannelDeleteHandler extends PacketHandler {
     private void handleServerVoiceChannel(JsonNode channelJson) {
         long serverId = channelJson.get("guild_id").asLong();
         long channelId = channelJson.get("id").asLong();
-        api.getAllServerById(serverId).ifPresent(server -> server.getVoiceChannelById(channelId).ifPresent(channel -> {
-            dispatchServerChannelDeleteEvent(channel);
-            ((ServerImpl) server).removeChannelFromCache(channel.getId());
-        }));
+        api.getPossiblyUnreadyServerById(serverId)
+                .ifPresent(server -> server.getVoiceChannelById(channelId).ifPresent(channel -> {
+                    dispatchServerChannelDeleteEvent(channel);
+                    ((ServerImpl) server).removeChannelFromCache(channel.getId());
+                }));
     }
 
     /**

@@ -484,7 +484,9 @@ public class DiscordApiImpl implements DiscordApi, InternalGloballyAttachableLis
      * @return A collection with all servers.
      */
     public Collection<Server> getAllServers() {
-        return Collections.unmodifiableList(new ArrayList<>(nonReadyServers.values()));
+        ArrayList<Server> allServers = new ArrayList<>(nonReadyServers.values());
+        allServers.addAll(servers.values());
+        return Collections.unmodifiableList(allServers);
     }
 
     /**
@@ -493,7 +495,7 @@ public class DiscordApiImpl implements DiscordApi, InternalGloballyAttachableLis
      * @param id The of the server.
      * @return The server with the given id.
      */
-    public Optional<Server> getAllServerById(long id) {
+    public Optional<Server> getPossiblyUnreadyServerById(long id) {
         if (nonReadyServers.containsKey(id)) {
             return Optional.ofNullable(nonReadyServers.get(id));
         }
