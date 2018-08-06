@@ -42,6 +42,7 @@ import org.javacord.core.entity.user.UserImpl;
 import org.javacord.core.entity.webhook.WebhookImpl;
 import org.javacord.core.listener.server.InternalServerAttachableListenerManager;
 import org.javacord.core.util.Cleanupable;
+import org.javacord.core.util.gateway.DiscordVoiceWebSocketAdapter;
 import org.javacord.core.util.logging.LoggerUtil;
 import org.javacord.core.util.rest.RestEndpoint;
 import org.javacord.core.util.rest.RestMethod;
@@ -224,6 +225,11 @@ public class ServerImpl implements Server, Cleanupable, InternalServerAttachable
     private final Collection<KnownCustomEmoji> customEmojis = new ArrayList<>();
 
     /**
+     * The voice web socket adapter for this server.
+     */
+    private final DiscordVoiceWebSocketAdapter voiceWebSocketAdapter;
+
+    /**
      * Creates a new server object.
      *
      * @param api The discord api instance.
@@ -333,6 +339,8 @@ public class ServerImpl implements Server, Cleanupable, InternalServerAttachable
         }
 
         api.addServerToCache(this);
+
+        voiceWebSocketAdapter = new DiscordVoiceWebSocketAdapter(this);
     }
 
     /**
@@ -769,6 +777,24 @@ public class ServerImpl implements Server, Cleanupable, InternalServerAttachable
      */
     public Collection<ServerChannel> getUnorderedChannels() {
         return channels.values();
+    }
+
+    /**
+     * Connects to the voice server and web socket for this server and joins the given channel.
+     *
+     * @param channel The server voice channel to initially join.
+     * @param muted Whether to connect self-muted.
+     * @param deafened Whether to connect self-deafened.
+     */
+    public void connectVoice(ServerVoiceChannel channel, boolean muted, boolean deafened) {
+        voiceWebSocketAdapter.connect(channel, muted, deafened);
+    }
+
+    /**
+     * Disconnects from the voice server and web socket for this server.
+     */
+    public void disconnectVoice() {
+        voiceWebSocketAdapter.disconnect();
     }
 
     @Override
